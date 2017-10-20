@@ -1,8 +1,14 @@
+from pymongo import MongoClient
 import paho.mqtt.client as mqtt
 import logging
 import json
-#測試RPI3發佈資料，本機訂閱資料
-TOPIC = "MYTOPIC"
+
+client = MongoClient("mongodb://admin:pome@192.168.124.81:27017/pome")
+db = client.pome
+
+#測試RPI3發佈資料，本機訂閱資料，並寫進mongo資料庫
+#這裡訂閱的資料以公司到機台設定組合而成
+TOPIC = "#"
 def on_connect(pahoClient, userdata, flags, rc):
     if rc==0:
         # client.connected_flag = True #set flag=True
@@ -19,6 +25,8 @@ def on_message(pahoClient, userdata, msg):
     payload = json.loads(msg.payload)
     print(payload['t'])
     print("this qos is:",msg.qos)
+    #
+    toMongo(msg.topic,msg.payload)
 #有log時的callback
 def on_log(pahoClient, userdata, level, buf):
     print("log: ",buf)
@@ -26,6 +34,16 @@ def on_disconnect(pahoClient, userdata,rc=0):
     print("disconnected")
     logging.debug("DisConnected result code "+str(rc))
     # pahoClient.loop_stop()
+def toMongo(topic,payload):
+    #把對應的topic和payload寫進MongoDB
+    TOPIC = topic
+    PAYLOAD = json.loads(payload)
+    timestamp = PAYLOAD['t']
+    way = PAYLOAD['w']
+    list = PAYLOAD['l']
+    dict = {'topic':TOPIC,'timestamp': timestamp, 'way': way,'list': list}
+    result = db.testMQTT.insert_one(dict)
+    print(result.inserted_id)
 
 broker_address="192.168.124.88"
 
@@ -40,7 +58,6 @@ try:
     mqttc.connect(broker_address)
 except ConnectionRefusedError as e:
     print("connection failed "+str(e))
-
 
 
 mqttc.loop_forever()
